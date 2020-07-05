@@ -1,0 +1,229 @@
+---
+title: "Classification and Regression"
+author: "Akshatha Shivashankar Chindalur"
+date: "10/18/2018"
+output:
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Task A: Modelling - Classification
+
+```{r}
+loan = read.csv("LoanData_train.csv")
+summary(loan)
+```
+
+The variable **loan_status** is the explanatory vaiable and according to the summary this is a categorical variable (2 levels) which takes either Fully Paid or Charged Off as its values. Since, a **qualitative** response is expected **Logistic Regression** is the most appropriate model for predicting if a loan will be repaid or not. In the case of **Linear Regression**, the model predicts a **quantitaive** response (y) and not a qualitative one. Also, unlike logistic regression, linear regression doesn't compute the probability of the variables that are required for classification.
+
+```{r}
+loan$grade<-as.numeric(loan$grade)
+```
+On converting the predictor **grade** to a numeric value the accuracy of model would improve as it influences the probability estimate. The **grade** indicates the **quality** of the loan and this would have a direct association in predicting if a loan is fully paid or not. Thus, converting it to a numeric value will improve the predictions.
+
+```{r}
+fullmod = glm(loan_status ~., data=loan, family=binomial)
+summary(fullmod)
+```
+
+The model for multiple logistic regression is given as:
+\[y^{\wedge}= \beta_0 + \beta_1x_1 + \beta_2x_2 + ...+ \beta_{12}x_{12}\]
+the first column **Estimate** gives the point estimates for the **co-efficients** ($\beta_1, \beta_2,...,\beta_{12}$) of all the predictor variables ($x_1, x_2, ...,x_{12}$).\s\s
+
+The next column **Std. Error** is the **standard error** for the **co-efficients** ($\beta_1, \beta_2,...,\beta_{12}$) estimated in column one.
+
+The first row in the co-efficients table represents the **intercept** $(\beta_0)$ which is the predicted value of **y** when the explanatory/predictor variables ($x_1, x_2, ...,x_{12}$) are all equal to **0**.
+
+```{r}
+loan_test = read.csv("LoanData_test.csv")
+loan_test$grade<-as.numeric(loan_test$grade)
+prob = predict(fullmod, loan_test, type ="response")
+```
+
+A positive co-efficient indicates a positive association between the predictor and the response variables. The co-efficients that are positive influence the **loan_status** and this pulls the probability towards **Fully Paid**. The negative co-efficients such as **term 60 months**, **int_rate**, **pub_rec**, etc are not in favour of the loan being paid and will also not have an infuence with the estimated probability. Thus, The probabilities predicted represent those of **Fully Paid** and not **Charged Off**.
+
+```{r}
+pred <- prob > 0.5
+loan_yhat <- as.factor(pred)
+levels(loan_yhat) <- c("Fully Paid", "Charged Off")
+
+table(loan_yhat,loan_test$loan_status)
+#gives the proportion of the data which was predicted accurately
+mean(loan_yhat == loan_test$loan_status)
+```
+
+**0.86** is the proportion of the test data that the trained model predicted accurately.
+
+By predicting that all the loan is fully paid, a proportion of **0.86** of the test data will be predicted accurately. No, we should not be using the simpler model as this would result in over fitting the data. This could also lead to more number of False Postives as **Charged Off** is not being predicted at all which results in decrease of accuracy and precision. On the other hand the complicated model can identify the True Negatives and reduce False Positives with more training and enhancements. 
+
+# Task B: Modelling - Regression
+
+It is observed that there are 6 missing values in the given data set. There is a correlation of 0.8 between number of **cylinders** and **horsepower** thus the missing values were treated with respect to this correlation. The mean horsepower of cars with cylinders = 4 is about 79 and the mean with cylinders = 6 is about 102. Thus the **?s** were replaced with these values.
+
+```{r}
+rm(list=ls())
+auto = read.csv("auto_mpg_train.csv")
+```
+
+```{r}
+plot(auto, col=auto$mpg)
+```
+
+```{r}
+library(ggcorrplot)
+corr <- round(cor(sapply(auto, as.numeric)), 1) 
+ggcorrplot(corr, hc.order = TRUE, type = "lower",
+   lab = TRUE)
+```
+
+From, the above correlations and the pair plot, the initial set of predictors that can be used for the regression model are **weight**, **displacement**, **horsepower**, **origin**, **acceleration** and **model.year**. These variables are used as they have a strong correlation with respect to **mpg**.
+
+```{r}
+drops = c("cylinders", "car.name")
+small = auto[, !names(auto)%in%drops]
+fit = lm(mpg~.,data=small)
+summary(fit)
+```
+
+The **p-value** is < 0.1, this indicates that the data against the null hypothesis of no association with the target variable. Thus, the above predictors can be considered to have a good association with the target/response variable, **mpg**.\s\s
+
+The **R-squared** or the coefficient-of-determination is high as **0.8209** which indicates that the model is a good fit for the given data.
+
+```{r}
+auto_test = read.csv("auto_mpg_test.csv")
+yhat_full = predict(fit, auto_test)
+error=mean((yhat_full - auto_test$mpg)^2)
+```
+
+The computed **MSE** for the test data set is **8.1274**
+
+The predictors, **displacement**, **weight** and **horsepower** are collinear and thus complicates the model estimation. Thus, only one of these is retained in the new model. An **interaction** is included in the new model which the product of **origin**, **model.year** and **displacement**.
+
+```{r}
+fit_new = lm(mpg~origin*model.year*displacement,data=auto_test)
+yhat_new = predict(fit_new, auto_test)
+error_new = mean((yhat_new - auto_test$mpg)^2)
+```
+
+The new model has a lower **MSE** of **2.8646** thus performing better than the previous model.
+
+# Task C: Sampling
+
+Inverse sampling is pseudo-random number sampling technique. Since, computing the inverse of an exponential function is easy and is computationally inexpensive, this method is opted for sampling the below given pdf.
+
+Considering the following probablility density function:
+
+\[p(x) = 2*e^{-2x}\]
+
+we get the CDF as:
+
+\[p(x) = 1 - e^{-2x}\]
+
+the quantile function obtained from the above function is:
+
+\[Q(x) = -\frac{1}{2}log(1-x)\]
+
+```{r}
+uniform_samples <- runif(200)
+samples <- -(0.5)*log(1-uniform_samples)
+hist(samples,breaks = 10,col = "orange")
+```
+
+From the given Bayesian Netwrok, the joint probability distribution as a product of contional probabilities is given as follows:
+\[ p(C, S, R, W) = p(C)p(S|C)p(R|C)p(W|S,R) \]
+where,\s\s
+
+C = Cloudy\s\s
+
+S = Sprinkler\s\s
+
+R = Rain\s\s
+
+W = WetGrass\s\s
+
+We know that, two variables in a Bayesian Network are independent if they do not have ay common ancestor and if one is not the ancestor of the other.
+
+1. **Cloudy**: since independance is symmetric and **Rain** is dependent on cloudy as it is the immediate ancestor. Thus, **Cloudy** is **dependent** on **Rain**.
+2. **Sprinkler**: as both **Sprinkler** and **Rain** share a common ancestor - **Cloudy**, **Sprinkler** is **dependent** on **Rain** unless it is **controlled** by **Cloudy**.
+3. **WetGrass**: its immediate ancestor/parent is **Rain**. Thus, **WetGrass** is **dependent** on **Rain**.
+
+Thus, there are **no independent** variables in the given model. 
+
+\[p(S|C,R,W)=\frac{p(S=T|C=F).p(W=F|S=T,R=T)}{p(S=T|C=T).p(W=F|S=T,R=T)+p(S=F|C=F)p(W=F|S=F,R=T)}\]
+
+```{r}
+p_s_given_crw <- function(S, C, R, W){
+  
+  cpt_c = c(0.5, 0.5)
+  cpt_s_given_c = matrix(c(0.5, 0.5, 0.9, 0.1), 2, 2, byrow = F)
+  cpt_r_given_c = matrix(c(0.8, 0.2, 0.2, 0.8), 2, 2, byrow = F)
+  cpt_w_given_sr = matrix(c(1, 0.1, 0.1, 0.01, 0, 0.9, 0.9, 0.99), 4, 2, byrow = F)
+  
+  return((cpt_s_given_c[S,C]*cpt_w_given_sr[4,W])/(cpt_s_given_c[2,C]*cpt_w_given_sr[4,W] + cpt_s_given_c[1,C]*cpt_w_given_sr[3,W]))
+  
+}
+
+#True: 2
+#False: 1
+p_s_given_crw(S = 2, C = 1, R = 2, W = 1)
+
+
+
+```
+The above function gives the:
+\[p(S=T|C=F,R=T,W=F) = 0.0909\]
+
+Gibbs sampling samples from a conditional distibution in a sequence forming a Monte Carlo Markov Chain.
+
+1. Initialise the variables: Cloudy$(C_0)$ = True and WetGrass$(W_0)$ = True. The other variables Sprinkler$(S_0)$ and Rain$(R_0)$ are initialised randomly. 
+2. The next step is to generate a sequence: $(C_0,S_0,R_0,W_0), (C_1,S_1,R_1,W_1), ...$ such that the values of the variables $C_0 = C_1 = ... =True$ and $W_0 = W_1 = ... = True$.
+3. The other variables are sampled by repeatedly going through the sequence generated in step 2.
+\[R_{n+1} \text{ from } p(R|C = T, S_n, W = T)\]
+\[S_{n+1} \text{ from } p(S|C = T, R_{n+1}, W = T)\]
+
+Since, this converges to a stationary distribution, a joint distribution conditioned on variables $C = True$ and $W = True$, large number off samples are generated. In order to let the Markov chain converge, the first few samples are burnt in and every next $n$ samples are considered for sampling.
+
+
+From the below conditional probabilities the Gibbs sampling can be computed as follows:
+
+\[p(R|C,S,W)=\frac{p(R|C=T).p(W=T|S_{n-1},R)}{p(R=T|C=T).p(W=T|S_{n-1},R=T)+p(R=F|C=T)p(W=T|S_{n-1},R=F)}\]
+\[p(S|C,R,W)=\frac{p(S|C=T).p(W=T|S,R_{n})}{p(S=T|C=T).p(W=T|S=T,R_{n})+p(S=F|C=T)p(W=T|S=F,R_{n})}\]
+
+```{r}
+# initialising values
+C_0 <- TRUE
+W_0 <- TRUE
+
+cpt_c = c(0.5, 0.5)
+cpt_s_given_c = matrix(c(0.5, 0.5, 0.9, 0.1), 2, 2, byrow = F)
+cpt_r_given_c = matrix(c(0.8, 0.2, 0.2, 0.8), 2, 2, byrow = F)
+cpt_w_given_sr = matrix(c(1, 0.1, 0.1, 0.01, 0, 0.9, 0.9, 0.99), 4, 2, byrow = F)
+
+#randomly generating the sequebce for the rain and sprinkler variable
+rain_seq <- sample(c(TRUE,FALSE), 1000, TRUE)
+sprinkler_seq <- sample(c(TRUE,FALSE), 1000, TRUE)
+
+result <- matrix(NA, nrow = 1000, ncol = 2)
+result[1,] <- c(rain_seq[1],sprinkler_seq[1])
+
+#running the sequence for 1000 cycles
+for (i in 2:1000){
+  #sampling the rain variable
+   result[i,1] <- (cpt_r_given_c[rain_seq[i]+1,2]*cpt_w_given_sr[(sprinkler_seq[i-1]*2+rain_seq[i]+1),2])/(cpt_r_given_c[1,2]*cpt_w_given_sr[(sprinkler_seq[i-1]*2+0+1),2] + cpt_r_given_c[2,2]*cpt_w_given_sr[(sprinkler_seq[i-1]*2+1+1),2])
+   #sampling the sprinkler variable
+   result[i,2] <- (cpt_s_given_c[sprinkler_seq[i]+1,2]*cpt_w_given_sr[(sprinkler_seq[i]*2+rain_seq[i]+1),2])/(cpt_s_given_c[2,2]*cpt_w_given_sr[(1*2+rain_seq[i]+1),2] + cpt_s_given_c[1,2]*cpt_w_given_sr[(0*2+rain_seq[i]+1),2])
+}
+
+#first 100 samples discarded(burn in)
+result <- tail(result, -100)
+#selecting every 10th sample to generate the estimate
+gibbs <- result[seq(1, nrow(result), 10), ]
+```
+
+##References
+1. https://www.datacamp.com/community/tutorials/logistic-regression-R
+2. https://en.wikipedia.org/wiki/Gibbs_sampling
